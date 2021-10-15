@@ -1,0 +1,20 @@
+[[source]]
+url = "https://pypi.org/simple"
+verify_ssl = true
+name = "pypi"
+
+[packages]
+pandas = "*"
+xlrd = "*"
+pytest = "*"
+numpy = "*"
+openpyxl = "*"
+mysql = "*"
+mysql-connector-python = "*"
+flask = "*"
+flask-mysql = "*"
+
+[dev-packages]
+
+[requires]
+python_version = "3.9"
