@@ -118,9 +118,9 @@ class VacationFileParser:
         for (ix, row) in self._df.iterrows():
             dtCell = row["offweek-mon"]
 
-            if self.isValidCell(dtCell):
+            if self._isValidCell(dtCell):
                 try:
-                    dt = self.getCellDate(row["offweek-mon"], year=currentYear)
+                    dt = self._getCellDate(row["offweek-mon"], year=currentYear)
                     currentYear = dt.year
 
                     if self.startDate is None:
@@ -138,8 +138,8 @@ class VacationFileParser:
                     ):
                         cell = row[col]
 
-                        if self.isValidCell(cell):
-                            doctors, weekType = self.getDoctorsAndWeekTypeFromCell(
+                        if self._isValidCell(cell):
+                            doctors, weekType = self._getDoctorsAndWeekTypeFromCell(
                                 row[col]
                             )
                             if len(doctors) > 0:
@@ -151,7 +151,7 @@ class VacationFileParser:
         self.endDate = dt + rd(weeks=1)
         self.doctorAssignments = doctorAssignments
 
-    def getCellDate(self, dateCell, year=None):
+    def _getCellDate(self, dateCell, year=None):
         components = dateCell.split(" ")
 
         # No idea.
@@ -178,10 +178,10 @@ class VacationFileParser:
                 f"{year}/{month}/{day}", "%Y/%b/%d"
             ).date()
 
-    def isValidCell(self, cell):
+    def _isValidCell(self, cell):
         return not pandas.isna(cell)
 
-    def getDoctorsAndWeekTypeFromCell(self, cell):
+    def _getDoctorsAndWeekTypeFromCell(self, cell):
         cell = cell.strip(" ")
 
         if cell.endswith("1/2f"):
@@ -204,7 +204,7 @@ class VacationFileParser:
 
         return doctorNames, weekType
 
-    def applyAssignment(self, schedule, monday, weekType, doctors):
+    def _applyAssignment(self, schedule, monday, weekType, doctors):
         friday = monday + rd(weekday=FR(1))
         wednesday = monday + rd(weekday=WE(1))
         thursday = monday + rd(weekday=TH(1))
@@ -236,6 +236,6 @@ class VacationFileParser:
 
         for assignment in self.doctorAssignments:
             monday, weekType, doctors = assignment
-            self.applyAssignment(schedule, monday, weekType, doctors)
+            self._applyAssignment(schedule, monday, weekType, doctors)
 
         return schedule
