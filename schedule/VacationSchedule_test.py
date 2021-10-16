@@ -9,4 +9,15 @@ class VacationParserTest(unittest.TestCase):
         filepath = os.path.join(ownDir, 'fixtures', 'vac to import to switches.xls')
         parser = VacationFileParser(filepath)
         schedule = parser.getSchedule()
-        schedule.toCsv('test2.csv')
+
+        parentDir = os.path.dirname(os.path.join(ownDir))
+        csvPath = os.path.join(parentDir, 'csv_outputs', 'test3.csv')
+        schedule.writeCsv(csvPath)
+
+    def test_toSql(self):
+        filepath = os.path.join(ownDir, 'fixtures', 'vac to import to switches.xls')
+        parser = VacationFileParser(filepath)
+        schedule = parser.getSchedule()
+        import pdb; pdb.set_trace()
+        schedule
+

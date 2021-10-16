@@ -37,7 +37,8 @@ class VacationSchedule:
 
     def addDoctorToDate(self, doc, dt):
         if doc in self._datesToDoctors[dt]:
-            raise Exception(f"Doctor {doc} is already off on {dt}")
+            # raise Exception(f"Doctor {doc} is already off on {dt}")
+            pass
 
         self._doctorsToDates.setdefault(doc, set()).add(dt)
         self._datesToDoctors[dt].add(doc)
@@ -58,13 +59,17 @@ class VacationSchedule:
         self.addDoctorToDate(doctor1, dt2)
         self.addDoctorToDate(doctor2, dt1)
 
-    def toSqlTable(tableName='call_schedule'):
-        NotImplementedError
+    def getCreateTableQuery(self, tableName='vacation_schedule'):
+        csvString = self.asCsvString()
+        csvRows = csvString.split('\n')
+        headers = csvRows[0].split(',')
+        monthNames = headers[1:]
+        createTableQueryComponents = [f"CREATE TABLE `{tableName}` ("] 
+        createTableQueryComponents.extend([f"`{monthName}` varchar(255) NOT NULL" for monthName in monthNames])
+        createTableQueryComponents.append(") ENGINE=MyISAM DEFAULT CHARSET=latin1;")
+        return ' '.join(createTableQueryComponents)
 
-
-
-
-    def toCsv(self, filepath):
+    def asCsvString(self):
         # Build this up column by column. Then transpose.
         data = []
 
@@ -96,11 +101,11 @@ class VacationSchedule:
         data = numpy.r_[[['Day']+list(range(1, 32))], data]
         data = data.T
         data = '\n'.join([','.join([el for el in row]) for row in data])
-
-        with open(filepath, 'w') as f:
-            f.write(data)
-
         return data
+
+    def writeCsv(self, filepath):
+        with open(filepath, 'w') as f:
+            f.write(self.asCsvString())
 
 
 class VacationFileParser:
