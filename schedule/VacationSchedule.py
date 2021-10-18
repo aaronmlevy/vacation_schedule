@@ -121,7 +121,7 @@ class VacationSchedule:
 
     def writeCalendarTo(self, filepath):
         with open(filepath, "w") as f:
-            f.write(self.asCalendarString())
+            f.write(self._asCalendarString())
 
     @staticmethod
     def fromGibberishFile(filepath):
