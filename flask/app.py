@@ -18,10 +18,12 @@ mysql.init_app(app)
 @app.route("/")
 def home():
     try:
-        conn = mysql.connect()
         csvSimpleDir = os.path.dirname(ownDir)
+        print(f"csvSimpleDir: {csvSimpleDir}")
+        conn = mysql.connect()
         csvSimpleFile = os.path.join(csvSimpleDir, "vacation_schedule.csv")
         vacationSchedule = VacationSchedule.fromCsvSimple(csvSimpleFile)
+        print(f"vacationSchedule: {vacationSchedule}")
 
         cursor = conn.cursor(pymysql.cursors.DictCursor)
         cursor.execute("SELECT * from call_schedule order by date")
