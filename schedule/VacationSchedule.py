@@ -16,24 +16,32 @@ MONTHS = [
     "Sep",
     "Oct",
     "Nov",
-    "Dec"
+    "Dec",
 ]
 
 
 class VacationSchedule:
     def __init__(self, startDate, endDate):
         """endDate is not included."""
-        self._datesToDoctors = {}
         self.startDate = startDate
         self.endDate = endDate
 
+        self._datesToDoctors = {}
+
         dt = startDate
-        dates = []
         while dt < endDate:
             self._datesToDoctors[dt] = set()
             dt += rd(days=1)
 
         self._doctorsToDates = {}
+
+    def __eq__(self, other):
+        if self._datesToDoctors == other._datesToDoctors:
+            assert (
+                self._doctorsToDates == other._doctorsToDates
+            ), "!! Big problem !! : datesToDoctors agree, but doctorsToDates do not."
+            return True
+        return False
 
     def addDoctorToDate(self, doc, dt):
         if doc in self._datesToDoctors[dt]:
@@ -45,9 +53,7 @@ class VacationSchedule:
 
     def removeDoctorFromDate(self, doc, dt):
         if doc not in self._datesToDoctors[dt]:
-            raise Exception(
-                f"Doctor {doc} is is not off on {dt}, so cannot be removed."
-            )
+            raise Exception(f"Doctor {doc} is not off on {dt}, so cannot be removed.")
 
         self._doctorsToDates[doc].remove(dt)
         self._datesToDoctors[dt].remove(doc)
@@ -59,17 +65,27 @@ class VacationSchedule:
         self.addDoctorToDate(doctor1, dt2)
         self.addDoctorToDate(doctor2, dt1)
 
-    def getCreateTableQuery(self, tableName='vacation_schedule'):
+    def getCreateTableQuery(self, tableName="vacation_schedule"):
         csvString = self.asCsvString()
-        csvRows = csvString.split('\n')
-        headers = csvRows[0].split(',')
+        csvRows = csvString.split("\n")
+        headers = csvRows[0].split(",")
         monthNames = headers[1:]
-        createTableQueryComponents = [f"CREATE TABLE `{tableName}` ("] 
-        createTableQueryComponents.extend([f"`{monthName}` varchar(255) NOT NULL" for monthName in monthNames])
+        createTableQueryComponents = [f"CREATE TABLE `{tableName}` ("]
+        createTableQueryComponents.extend(
+            [f"`{monthName}` varchar(255) NOT NULL" for monthName in monthNames]
+        )
         createTableQueryComponents.append(") ENGINE=MyISAM DEFAULT CHARSET=latin1;")
-        return ' '.join(createTableQueryComponents)
 
-    def asCsvString(self):
+
+        # OTHER USEFUL SQL COMMANDS
+        # ALTER TABLE `users`
+          # ADD PRIMARY KEY (`date`);
+
+        # INSERT INTO `call_schedule` (`date`, `phx`, `mrct`, `cch`, `mini1`, `mini2`) VALUES
+        # (date('2021-05-08'),'ls','ba','bs','mp','gg');
+        return " ".join(createTableQueryComponents)
+
+    def _asCalendarString(self):
         # Build this up column by column. Then transpose.
         data = []
 
@@ -78,37 +94,77 @@ class VacationSchedule:
         # of startDate.
         dt = self.startDate
         numberOfPaddedCells = dt.day - 1
-        column = [MONTHS[dt.month-1] + f" {dt.year}"] + numberOfPaddedCells * ['X']
+        column = [MONTHS[dt.month - 1] + f" {dt.year}"] + numberOfPaddedCells * ["X"]
 
         # Now loop over each date and create a new column when the month changes.
         currMonth = dt.month
         while dt < self.endDate:
             if dt.month != currMonth:
                 data.append(column)
-                column = [MONTHS[dt.month-1] + f" {dt.year}"]
+                column = [MONTHS[dt.month - 1] + f" {dt.year}"]
                 currMonth = dt.month
             doctors = self._datesToDoctors[dt]
-            column.append(' '.join(doctors))
-            dt+=rd(days=1)
+            column.append(" ".join(doctors))
+            dt += rd(days=1)
         data.append(column)
 
         # Since the months have differing numbers of days, we have to pad
         # the shorter months with 'X' at the end.
         pad = len(max(data, key=len))
-        data = numpy.array([i + ['X']*(pad-len(i)) for i in data])
+        data = numpy.array([i + ["X"] * (pad - len(i)) for i in data])
 
         # Now prepend the day number column, transpose, and turn into a string.
-        data = numpy.r_[[['Day']+list(range(1, 32))], data]
+        data = numpy.r_[[["Day"] + list(range(1, 32))], data]
         data = data.T
-        data = '\n'.join([','.join([el for el in row]) for row in data])
+        data = "\n".join([",".join([el for el in row]) for row in data])
         return data
 
-    def writeCsv(self, filepath):
-        with open(filepath, 'w') as f:
-            f.write(self.asCsvString())
+    def writeCalendarTo(self, filepath):
+        with open(filepath, "w") as f:
+            f.write(self.asCalendarString())
+
+    @staticmethod
+    def fromGibberishFile(filepath):
+        return _VacationFileParser(filepath).getSchedule()
+
+    def _asCsvSimpleString(self):
+        csvRows = ["date,doctors"]
+        for dt, doctorSet in self._datesToDoctors.items():
+            csvRows.append(f"{dt},{sorted(list(doctorSet))}")
+        return "\n".join(csvRows)
+
+    def toCsvSimple(self, filepath):
+        with open(filepath, "w") as f:
+            f.write(self._asCsvSimpleString())
+
+    @staticmethod
+    def fromCsvSimple(filepath):
+        with open(filepath, "r") as f:
+            csvString = f.read()
+        csvRows = csvString.split("\n")
+
+        startDate = datetime.datetime.strptime(
+            csvRows[1].split(",")[0], "%Y-%m-%d"
+        ).date()
+        endDate = datetime.datetime.strptime(
+            csvRows[-1].split(",")[0], "%Y-%m-%d"
+        ).date() + rd(days=1)
+
+        schedule = VacationSchedule(startDate, endDate)
+
+        for row in csvRows[1:]:
+            splitRow = row.split(",")
+            dt = splitRow[0]
+            doctorList = ",".join(splitRow[1:])
+
+            dt = datetime.datetime.strptime(dt, "%Y-%m-%d").date()
+            for doc in eval(doctorList):
+                schedule.addDoctorToDate(doc, dt)
+
+        return schedule
 
 
-class VacationFileParser:
+class _VacationFileParser:
     def __init__(self, filepath):
         self._df = pandas.read_excel(filepath, dtype=str)
         self.startDate = None
@@ -234,7 +290,7 @@ class VacationFileParser:
                     schedule.addDoctorToDate(doctor, dt)
                     dt += rd(days=1)
             else:
-                raise Exception(f'Invalid weekType {weekType}')
+                raise Exception(f"Invalid weekType {weekType}")
 
     def getSchedule(self):
         schedule = VacationSchedule(self.startDate, self.endDate)

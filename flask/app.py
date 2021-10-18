@@ -1,8 +1,10 @@
 from flask import Flask, request, render_template, jsonify
-from flaskext.mysql import MySQL  
+from flaskext.mysql import MySQL
 import pymysql
+import os
 
 app = Flask(__name__)
+ownDir = os.path.dirname(os.path.abspath(__file__))
 
 mysql = MySQL()
 
@@ -17,9 +19,14 @@ mysql.init_app(app)
 def home():
     try:
         conn = mysql.connect()
+        csvSimpleDir = os.path.dirname(ownDir)
+        csvSimpleFile = os.path.join(csvSimpleDir, "vacation_schedule.csv")
+        vacationSchedule = VacationSchedule.fromCsvSimple(csvSimpleFile)
+
         cursor = conn.cursor(pymysql.cursors.DictCursor)
         cursor.execute("SELECT * from call_schedule order by date")
         schedule = cursor.fetchall()
+        print(f"schedule: {schedule}")
         return render_template("index.html", schedule=schedule)
     except Exception as e:
         print(e)
