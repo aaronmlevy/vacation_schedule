@@ -226,6 +226,37 @@ class VacationSchedule:
         df = pandas.read_sql(f'select * from {tableName}', engine)
         return VacationSchedule._fromDataframe(df)
 
+    def toSqlSimple(self, tableName = 'vacation_schedule'):
+        engine = create_engine('mysql+pymysql://root:@localhost/vacation_schedule_db')
+        csvString = self._asCsvSimpleString()
+        csvRows=csvString.split('\n')
+        csvRowsNew = [csvRows[0]]
+        for row in csvRows[1:]:
+            rowSplit = row.split(',')
+            dt = rowSplit[0]
+            doctorList = eval(','.join(rowSplit[1:]))
+            doctorListString = ' '.join([doctor for doctor in doctorList])
+            csvRowsNew.append(f"{dt},{doctorListString}")
+        csvStringNew = '\n'.join(csvRowsNew)
+
+        df = pandas.read_csv(io.StringIO(csvStringNew))
+        df = df.fillna('')
+        df.to_sql(tableName, engine)
+
+    @staticmethod
+    def fromSqlSimple(tableName = 'vacation_schedule'):
+        engine = create_engine('mysql+pymysql://root:@localhost/vacation_schedule_db')
+        df = pandas.read_sql(f'select * from {tableName}', engine)
+        startDate = datetime.datetime.strptime(df.date[0], "%Y-%m-%d").date()
+        endDate = datetime.datetime.strptime(df.date[len(df)-1], "%Y-%m-%d").date()
+        schedule = VacationSchedule(startDate, endDate+rd(days=1))
+        for _, row in df.iterrows():
+            docs = row.doctors.split(' ')
+            for doc in docs:
+                if doc != '':
+                    dt = datetime.datetime.strptime(row.date, "%Y-%m-%d").date()
+                    schedule.addDoctorToDate(doc, dt)
+        return schedule
 
 class _VacationFileParser:
     def __init__(self, filepath):
@@ -305,20 +336,83 @@ class _VacationFileParser:
     def _isValidCell(self, cell):
         return not pandas.isna(cell)
 
+    @staticmethod
+    def _isANumber(string):
+        try:
+            float(string)
+            return True
+        except ValueError:
+            return False
+
+    def findIndicesOfNumbers(self, string):
+        numericIndices = []
+        for ix in range(len(string)):
+            if self._isANumber(string[ix]):
+                numericIndices.append(ix)
+
+        return numericIndices
+
+    @staticmethod
+    def readCell(cell):
+        cellStripped = ''.join(cell.split(' '))
+        docsToDays = {}
+
+        doc = []
+        day = []
+        for ix in range(len(cellStripped)):
+            character = cellStripped[ix]
+
+            if not character.isalnum() and character != '/':
+                pass
+
+            elif _VacationFileParser._isANumber(character):
+                day.append(character)
+
+            elif character == '/':
+                if len(day)>0:
+                    day = int(''.join(day))
+                    doc = ''.join(doc)
+                    docsToDays.setdefault(doc, []).append(day)
+                    day = []
+                else:
+                    pass
+
+            else:
+                if len(doc) == 2:
+                    docsToDays.setdefault(doc, []).append(int(''.join(day)))
+                    doc = [character]
+                    day = []
+                else:
+                    doc.append(character)
+
+        if len(day)>0:
+            if isinstance(doc, list):
+                doc = ''.join(doc)
+            docsToDays.setdefault(doc, []).append(int(''.join(day)))
+        return docsToDays
+
     def _getDoctorsAndWeekTypeFromCell(self, cell):
         cell = cell.strip(" ")
 
         if cell.endswith("1/2f"):
             weekType = "firstHalf"
             doctors = cell.split("1/2f")[0].split(" ")
+            dayNumbers = []
 
         elif cell.endswith("1/2s"):
             weekType = "secondHalf"
             doctors = cell.split("1/2s")[0].split(" ")
+            dayNumbers = []
+
+        elif any([self._isANumber(char) for char in cell]):
+            docsToNumbers = self.readCell(cell)
+            weekType = "special"
+            return docsToNumbers, weekType
 
         else:
             weekType = "full"
             doctors = cell.split(" ")
+
 
         doctorNames = []
         for doctor in doctors:
@@ -329,31 +423,39 @@ class _VacationFileParser:
         return doctorNames, weekType
 
     def _applyAssignment(self, schedule, monday, weekType, doctors):
-        friday = monday + rd(weekday=FR(1))
-        wednesday = monday + rd(weekday=WE(1))
-        thursday = monday + rd(weekday=TH(1))
-
-        for doctor in doctors:
-            dt = monday
-            if weekType == "full":
-                while dt <= friday:
+        if weekType == 'special':
+            assert isinstance(doctors, dict)
+            for doctor, dayNumbers in doctors.items():
+                for day in dayNumbers:
+                    dt = datetime.date(monday.year, monday.month, day)
                     schedule.addDoctorToDate(doctor, dt)
-                    dt += rd(days=1)
+        else:
 
-            elif weekType == "firstHalf":
-                while dt < wednesday:
-                    schedule.addDoctorToDate(doctor, dt)
-                    dt += rd(days=1)
-                schedule.addDoctorToDate(doctor + "1", wednesday)
+            friday = monday + rd(weekday=FR(1))
+            wednesday = monday + rd(weekday=WE(1))
+            thursday = monday + rd(weekday=TH(1))
 
-            elif weekType == "secondHalf":
-                schedule.addDoctorToDate(doctor + "2", wednesday)
-                dt = thursday
-                while dt <= friday:
-                    schedule.addDoctorToDate(doctor, dt)
-                    dt += rd(days=1)
-            else:
-                raise Exception(f"Invalid weekType {weekType}")
+            for doctor in doctors:
+                dt = monday
+                if weekType == "full":
+                    while dt <= friday:
+                        schedule.addDoctorToDate(doctor, dt)
+                        dt += rd(days=1)
+
+                elif weekType == "firstHalf":
+                    while dt < wednesday:
+                        schedule.addDoctorToDate(doctor, dt)
+                        dt += rd(days=1)
+                    schedule.addDoctorToDate(doctor + "1", wednesday)
+
+                elif weekType == "secondHalf":
+                    schedule.addDoctorToDate(doctor + "2", wednesday)
+                    dt = thursday
+                    while dt <= friday:
+                        schedule.addDoctorToDate(doctor, dt)
+                        dt += rd(days=1)
+                else:
+                    raise Exception(f"Invalid weekType {weekType}")
 
     def getSchedule(self):
         schedule = VacationSchedule(self.startDate, self.endDate)
