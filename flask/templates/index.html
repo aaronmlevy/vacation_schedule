@@ -1,6 +1,20 @@
 <!doctype html>
 <html>
 <head>
+<style type="text/css" media="screen">
+
+table{
+	border-collapse:collapse;
+	border:1px solid #000000;
+	table-layout: fixed;
+	font-size:.7vw;
+
+}
+
+      table td{
+	      border:1px solid #000000;
+      }
+</style>
 <title>Vacation Calendar</title>
 <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.6/css/bootstrap.min.css" />    
 <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.1.0/jquery.min.js"></script>
@@ -52,42 +66,22 @@ $(document).ready(function(){
 </head>
 <body >
 <div class="container" >
-    <div class="row" style="padding:50px;">
+    <div class="row" >
         <p><h1>Vacation Calendar</h1></p>
         <table width='100%' border='0'>
          <tr>
-          <th width='16.66%'>Date</th>
-          <th width='16.66%'>PHX</th>
-          <th width='16.66%'>MRCT</th>
-          <th width='16.66%'>CCH</th>
-          <th width='16.66%'>Mini1</th>
-          <th width='16.66%'>Mini2</th>
+	 {% for colName in columnNames%}
+	 <th type='text'> {{colName}} </th>
+	 {% endfor %}
          </tr>
          {% for row in schedule %}    
          <tr>
+	    {% for colName in columnNames %}
           <td> 
-            <div class='readonly' > {{row.date}}</div> 
+		  <div class='edit'> {{row[colName]}}</div> 
+	    <input type='textbox' class='txtedit' value='{{row[colName]}}' id='{{row[colName]}}_{{colName}}'>
           </td>
-          <td> 
-            <div class='edit' > {{row.phx}}</div> 
-            <input type='text' class='txtedit' value='{{row.phx}}' id='{{row.date}}_phx' >
-          </td>
-          <td> 
-            <div class='edit' > {{row.mrct}}</div> 
-            <input type='text' class='txtedit' value='{{row.mrct}}' id='{{row.date}}_mrct' >
-          </td>
-          <td> 
-            <div class='edit' > {{row.cch}}</div> 
-            <input type='text' class='txtedit' value='{{row.cch}}' id='{{row.date}}_cch' >
-          </td>
-          <td> 
-            <div class='edit' > {{row.mini1}}</div> 
-            <input type='text' class='txtedit' value='{{row.mini1}}' id='{{row.date}}_mini1' >
-          </td>
-          <td> 
-            <div class='edit' > {{row.mini2}}</div> 
-            <input type='text' class='txtedit' value='{{row.mini2}}' id='{{row.date}}_mini2' >
-          </td>
+	    {% endfor %}
          </tr>
          {% endfor %} 
         </table>
@@ -96,7 +90,7 @@ $(document).ready(function(){
 <style>
 .edit{
  width: 100%;
- height: 25px;
+ height: 30%;
 }
 .editMode{
  border: 1px solid black;

@@ -13,6 +13,8 @@ mysql = "*"
 mysql-connector-python = "*"
 flask = "*"
 flask-mysql = "*"
+mysqlclient = "*"
+sqlalchemy = "*"
 
 [dev-packages]
 

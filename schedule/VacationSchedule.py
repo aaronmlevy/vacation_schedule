@@ -1,8 +1,10 @@
 import pandas
 import numpy
 import datetime
+import io
 import os
 from dateutil.relativedelta import relativedelta as rd, MO, TU, WE, TH, FR, SA, SU
+from sqlalchemy import create_engine
 
 MONTHS = [
     "Jan",
@@ -66,23 +68,19 @@ class VacationSchedule:
         self.addDoctorToDate(doctor2, dt1)
 
     def getCreateTableQuery(self, tableName="vacation_schedule"):
-        csvString = self.asCsvString()
+        csvString = self._asCalendarString()
         csvRows = csvString.split("\n")
         headers = csvRows[0].split(",")
         monthNames = headers[1:]
         createTableQueryComponents = [f"CREATE TABLE `{tableName}` ("]
+        createTableQueryComponents.append("`Day` varchar(255) NOT NULL,")
         createTableQueryComponents.extend(
-            [f"`{monthName}` varchar(255) NOT NULL" for monthName in monthNames]
+            [f"`{monthName}` varchar(255) NOT NULL," for monthName in monthNames]
         )
-        createTableQueryComponents.append(") ENGINE=MyISAM DEFAULT CHARSET=latin1;")
-
-
-        # OTHER USEFUL SQL COMMANDS
-        # ALTER TABLE `users`
-          # ADD PRIMARY KEY (`date`);
-
-        # INSERT INTO `call_schedule` (`date`, `phx`, `mrct`, `cch`, `mini1`, `mini2`) VALUES
-        # (date('2021-05-08'),'ls','ba','bs','mp','gg');
+        lastRow = createTableQueryComponents[-1]
+        lastRow = lastRow[:-1]
+        createTableQueryComponents[-1] = lastRow
+        createTableQueryComponents.append(");")
         return " ".join(createTableQueryComponents)
 
     def _asCalendarString(self):
@@ -119,9 +117,62 @@ class VacationSchedule:
         data = "\n".join([",".join([el for el in row]) for row in data])
         return data
 
-    def writeCalendarTo(self, filepath):
+    def writeAsCalendar(self, filepath):
         with open(filepath, "w") as f:
             f.write(self._asCalendarString())
+
+    @staticmethod
+    def _fromDataframe(df):
+        columnNames = df.columns.tolist()
+        assert 'Day' in columnNames
+        dayIndex = columnNames.index('Day')
+
+        monthNames = columnNames[dayIndex+1:]
+        days = df['Day']
+
+        # Get start date.
+        firstMonth = monthNames[0]
+        firstMonthAssignments = df[monthNames[0]]
+        validStartDateIndices = (~firstMonthAssignments.isna() * firstMonthAssignments!='X').tolist()
+        startDateIndex = min(ix for ix, assignment in enumerate(validStartDateIndices) if assignment)
+        day = days.iloc[startDateIndex]
+        startDate = datetime.datetime.strptime(
+            f"{firstMonth}-{day}", "%b %Y-%d"
+        ).date()
+
+        # Get end date.
+        lastMonth = monthNames[-1]
+        lastMonthAssignments = df[lastMonth]
+        validEndDateIndices = (~lastMonthAssignments.isna() * firstMonthAssignments!='X').tolist()
+        endDateIndex = max(ix for ix, assignment in enumerate(validEndDateIndices) if assignment)
+        day = days.iloc[endDateIndex]
+        endDate = datetime.datetime.strptime(
+            f"{lastMonth}-{day}", "%b %Y-%d"
+        ).date()
+        endDate=endDate + rd(months=1)
+        endDate = datetime.date(endDate.year, endDate.month, 1)
+
+        # Add all the doctors.
+        schedule = VacationSchedule(startDate, endDate)
+        for monthName in monthNames:
+            for ix, docs in enumerate(df[monthName]):
+                if not pandas.isna(docs) and docs != 'X' and docs != '':
+                    docs = docs.split(' ')
+                    day = days.iloc[ix]
+                    dt = datetime.datetime.strptime(
+                        f"{monthName}-{day}", "%b %Y-%d"
+                    ).date()
+                    for doc in docs:
+                        schedule.addDoctorToDate(doc, dt)
+
+        return schedule
+
+    @staticmethod
+    def fromCalendar(filepath):
+        df = pandas.read_csv(filepath, dtype=str)
+        return VacationSchedule._fromDataframe(df)
+
+
 
     @staticmethod
     def fromGibberishFile(filepath):
@@ -162,6 +213,18 @@ class VacationSchedule:
                 schedule.addDoctorToDate(doc, dt)
 
         return schedule
+
+    def toSql(self, tableName = 'vacation_schedule'):
+        engine = create_engine('mysql+pymysql://root:@localhost/vacation_schedule_db')
+        df = pandas.read_csv(io.StringIO(self._asCalendarString()))
+        df = df.fillna('')
+        df.to_sql(tableName, engine)
+
+    @staticmethod
+    def fromSql(tableName = 'vacation_schedule'):
+        engine = create_engine('mysql+pymysql://root:@localhost/vacation_schedule_db')
+        df = pandas.read_sql(f'select * from {tableName}', engine)
+        return VacationSchedule._fromDataframe(df)
 
 
 class _VacationFileParser:

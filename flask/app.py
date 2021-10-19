@@ -13,7 +13,7 @@ mysql = MySQL()
 
 app.config["MYSQL_DATABASE_USER"] = "root"
 app.config["MYSQL_DATABASE_PASSWORD"] = ""
-app.config["MYSQL_DATABASE_DB"] = "schedule_db"
+app.config["MYSQL_DATABASE_DB"] = "vacation_schedule_db"
 app.config["MYSQL_DATABASE_HOST"] = "localhost"
 mysql.init_app(app)
 
@@ -21,17 +21,17 @@ mysql.init_app(app)
 @app.route("/")
 def home():
     try:
-        csvSimpleDir = os.path.dirname(ownDir)
-        # conn = mysql.connect()
-        csvSimpleFile = os.path.join(csvSimpleDir, "calendar", "calendar.csv")
-        print(f"csvSimpleFile: {csvSimpleFile}")
-        vacationSchedule = VacationSchedule.fromCsvSimple(csvSimpleFile)
-
+        conn = mysql.connect()
         cursor = conn.cursor(pymysql.cursors.DictCursor)
-        cursor.execute("SELECT * from call_schedule order by date")
+        cursor.execute("SELECT * from vacation_schedule")
         schedule = cursor.fetchall()
-        print(f"schedule: {schedule}")
-        return render_template("index.html", schedule=schedule)
+
+        if len(schedule)>0:
+            columnNames = list(schedule[0].keys())
+            columnNames = columnNames[1:]
+
+        return render_template("index.html", schedule=schedule, columnNames=columnNames, numColumns=len(columnNames))
+
     except Exception as e:
         print(e)
     finally:
@@ -45,16 +45,16 @@ def update():
         conn = mysql.connect()
         cursor = conn.cursor(pymysql.cursors.DictCursor)
         if request.method == "POST":
-            date = request.form["field"]
-            docName = request.form["value"]
-            location = request.form["id"]
+            # date = request.form["field"]
+            # docName = request.form["value"]
+            # location = request.form["id"]
 
-            sql = f"UPDATE call_schedule SET {location}='{docName}' WHERE date=DATE('{date}')"
+            # sql = f"UPDATE call_schedule SET {location}='{docName}' WHERE date=DATE('{date}')"
 
-            conn = mysql.connect()
-            cursor = conn.cursor()
-            cursor.execute(sql)
-            conn.commit()
+            # conn = mysql.connect()
+            # cursor = conn.cursor()
+            # cursor.execute(sql)
+            # conn.commit()
             success = 1
         return jsonify(success)
     except Exception as e:
