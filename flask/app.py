@@ -26,11 +26,16 @@ def home():
         cursor.execute("SELECT * from vacation_schedule")
         schedule = cursor.fetchall()
 
-        if len(schedule)>0:
+        if len(schedule) > 0:
             columnNames = list(schedule[0].keys())
             columnNames = columnNames[1:]
 
-        return render_template("index.html", schedule=schedule, columnNames=columnNames, numColumns=len(columnNames))
+        return render_template(
+            "index.html",
+            schedule=schedule,
+            columnNames=columnNames,
+            numColumns=len(columnNames),
+        )
 
     except Exception as e:
         print(e)
@@ -45,16 +50,17 @@ def update():
         conn = mysql.connect()
         cursor = conn.cursor(pymysql.cursors.DictCursor)
         if request.method == "POST":
-            # date = request.form["field"]
-            # docName = request.form["value"]
-            # location = request.form["id"]
+            date = request.form["field"]
+            newDoctorList = request.form["value"]
 
-            # sql = f"UPDATE call_schedule SET {location}='{docName}' WHERE date=DATE('{date}')"
+            sql = (
+                f"UPDATE vacation_schedule SET doctors='{newDoctorList}' WHERE date='{date}';"
+            )
 
-            # conn = mysql.connect()
-            # cursor = conn.cursor()
-            # cursor.execute(sql)
-            # conn.commit()
+            conn = mysql.connect()
+            cursor = conn.cursor()
+            cursor.execute(sql)
+            conn.commit()
             success = 1
         return jsonify(success)
     except Exception as e:

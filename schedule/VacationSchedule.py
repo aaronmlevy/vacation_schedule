@@ -6,6 +6,7 @@ import os
 from dateutil.relativedelta import relativedelta as rd, MO, TU, WE, TH, FR, SA, SU
 from sqlalchemy import create_engine
 
+WEEKDAYS = ["Mo", "Tu", "We", "Th", "Fr", "Sa", "Su"]
 MONTHS = [
     "Jan",
     "Feb",
@@ -124,44 +125,46 @@ class VacationSchedule:
     @staticmethod
     def _fromDataframe(df):
         columnNames = df.columns.tolist()
-        assert 'Day' in columnNames
-        dayIndex = columnNames.index('Day')
+        assert "Day" in columnNames
+        dayIndex = columnNames.index("Day")
 
-        monthNames = columnNames[dayIndex+1:]
-        days = df['Day']
+        monthNames = columnNames[dayIndex + 1 :]
+        days = df["Day"]
 
         # Get start date.
         firstMonth = monthNames[0]
         firstMonthAssignments = df[monthNames[0]]
-        validStartDateIndices = (~firstMonthAssignments.isna() * firstMonthAssignments!='X').tolist()
-        startDateIndex = min(ix for ix, assignment in enumerate(validStartDateIndices) if assignment)
+        validStartDateIndices = (
+            ~firstMonthAssignments.isna() * firstMonthAssignments != "X"
+        ).tolist()
+        startDateIndex = min(
+            ix for ix, assignment in enumerate(validStartDateIndices) if assignment
+        )
         day = days.iloc[startDateIndex]
-        startDate = datetime.datetime.strptime(
-            f"{firstMonth}-{day}", "%b %Y-%d"
-        ).date()
+        startDate = datetime.datetime.strptime(f"{firstMonth}-{day}", "%b %Y-%d").date()
 
         # Get end date.
         lastMonth = monthNames[-1]
         lastMonthAssignments = df[lastMonth]
-        validEndDateIndices = (~lastMonthAssignments.isna() * firstMonthAssignments!='X').tolist()
-        endDateIndex = max(ix for ix, assignment in enumerate(validEndDateIndices) if assignment)
+        validEndDateIndices = (
+            ~lastMonthAssignments.isna() * firstMonthAssignments != "X"
+        ).tolist()
+        endDateIndex = max(
+            ix for ix, assignment in enumerate(validEndDateIndices) if assignment
+        )
         day = days.iloc[endDateIndex]
-        endDate = datetime.datetime.strptime(
-            f"{lastMonth}-{day}", "%b %Y-%d"
-        ).date()
-        endDate=endDate + rd(months=1)
+        endDate = datetime.datetime.strptime(f"{lastMonth}-{day}", "%b %Y-%d").date()
+        endDate = endDate + rd(months=1)
         endDate = datetime.date(endDate.year, endDate.month, 1)
 
         # Add all the doctors.
         schedule = VacationSchedule(startDate, endDate)
         for monthName in monthNames:
             for ix, docs in enumerate(df[monthName]):
-                if not pandas.isna(docs) and docs != 'X' and docs != '':
-                    docs = docs.split(' ')
+                if not pandas.isna(docs) and docs != "X" and docs != "":
+                    docs = docs.split(" ")
                     day = days.iloc[ix]
-                    dt = datetime.datetime.strptime(
-                        f"{monthName}-{day}", "%b %Y-%d"
-                    ).date()
+                    dt = datetime.datetime.strptime(f"{monthName}-{day}", "%b %Y-%d").date()
                     for doc in docs:
                         schedule.addDoctorToDate(doc, dt)
 
@@ -171,8 +174,6 @@ class VacationSchedule:
     def fromCalendar(filepath):
         df = pandas.read_csv(filepath, dtype=str)
         return VacationSchedule._fromDataframe(df)
-
-
 
     @staticmethod
     def fromGibberishFile(filepath):
@@ -194,9 +195,7 @@ class VacationSchedule:
             csvString = f.read()
         csvRows = csvString.split("\n")
 
-        startDate = datetime.datetime.strptime(
-            csvRows[1].split(",")[0], "%Y-%m-%d"
-        ).date()
+        startDate = datetime.datetime.strptime(csvRows[1].split(",")[0], "%Y-%m-%d").date()
         endDate = datetime.datetime.strptime(
             csvRows[-1].split(",")[0], "%Y-%m-%d"
         ).date() + rd(days=1)
@@ -214,49 +213,50 @@ class VacationSchedule:
 
         return schedule
 
-    def toSql(self, tableName = 'vacation_schedule'):
-        engine = create_engine('mysql+pymysql://root:@localhost/vacation_schedule_db')
+    def toSql(self, tableName="vacation_schedule"):
+        engine = create_engine("mysql+pymysql://root:@localhost/vacation_schedule_db")
         df = pandas.read_csv(io.StringIO(self._asCalendarString()))
-        df = df.fillna('')
+        df = df.fillna("")
         df.to_sql(tableName, engine)
 
     @staticmethod
-    def fromSql(tableName = 'vacation_schedule'):
-        engine = create_engine('mysql+pymysql://root:@localhost/vacation_schedule_db')
-        df = pandas.read_sql(f'select * from {tableName}', engine)
+    def fromSql(tableName="vacation_schedule"):
+        engine = create_engine("mysql+pymysql://root:@localhost/vacation_schedule_db")
+        df = pandas.read_sql(f"select * from {tableName}", engine)
         return VacationSchedule._fromDataframe(df)
 
-    def toSqlSimple(self, tableName = 'vacation_schedule'):
-        engine = create_engine('mysql+pymysql://root:@localhost/vacation_schedule_db')
+    def toSqlSimple(self, tableName="vacation_schedule"):
+        engine = create_engine("mysql+pymysql://root:@localhost/vacation_schedule_db")
         csvString = self._asCsvSimpleString()
-        csvRows=csvString.split('\n')
+        csvRows = csvString.split("\n")
         csvRowsNew = [csvRows[0]]
         for row in csvRows[1:]:
-            rowSplit = row.split(',')
+            rowSplit = row.split(",")
             dt = rowSplit[0]
-            doctorList = eval(','.join(rowSplit[1:]))
-            doctorListString = ' '.join([doctor for doctor in doctorList])
+            doctorList = eval(",".join(rowSplit[1:]))
+            doctorListString = " ".join([doctor for doctor in doctorList])
             csvRowsNew.append(f"{dt},{doctorListString}")
-        csvStringNew = '\n'.join(csvRowsNew)
+        csvStringNew = "\n".join(csvRowsNew)
 
         df = pandas.read_csv(io.StringIO(csvStringNew))
-        df = df.fillna('')
+        df = df.fillna("")
         df.to_sql(tableName, engine)
 
     @staticmethod
-    def fromSqlSimple(tableName = 'vacation_schedule'):
-        engine = create_engine('mysql+pymysql://root:@localhost/vacation_schedule_db')
-        df = pandas.read_sql(f'select * from {tableName}', engine)
+    def fromSqlSimple(tableName="vacation_schedule"):
+        engine = create_engine("mysql+pymysql://root:@localhost/vacation_schedule_db")
+        df = pandas.read_sql(f"select * from {tableName}", engine)
         startDate = datetime.datetime.strptime(df.date[0], "%Y-%m-%d").date()
-        endDate = datetime.datetime.strptime(df.date[len(df)-1], "%Y-%m-%d").date()
-        schedule = VacationSchedule(startDate, endDate+rd(days=1))
+        endDate = datetime.datetime.strptime(df.date[len(df) - 1], "%Y-%m-%d").date()
+        schedule = VacationSchedule(startDate, endDate + rd(days=1))
         for _, row in df.iterrows():
-            docs = row.doctors.split(' ')
+            docs = row.doctors.split(" ")
             for doc in docs:
-                if doc != '':
+                if doc != "":
                     dt = datetime.datetime.strptime(row.date, "%Y-%m-%d").date()
                     schedule.addDoctorToDate(doc, dt)
         return schedule
+
 
 class _VacationFileParser:
     def __init__(self, filepath):
@@ -294,9 +294,7 @@ class _VacationFileParser:
                         cell = row[col]
 
                         if self._isValidCell(cell):
-                            doctors, weekType = self._getDoctorsAndWeekTypeFromCell(
-                                row[col]
-                            )
+                            doctors, weekType = self._getDoctorsAndWeekTypeFromCell(row[col])
                             if len(doctors) > 0:
                                 doctorAssignments.append((dt, weekType, doctors))
 
@@ -320,18 +318,14 @@ class _VacationFileParser:
         elif len(components) == 2:
             dateInfo = components[0]
             [_, month, day] = dateInfo.split("-")
-            return datetime.datetime.strptime(
-                f"{year}-{month}-{day}", "%Y-%m-%d"
-            ).date()
+            return datetime.datetime.strptime(f"{year}-{month}-{day}", "%Y-%m-%d").date()
 
         # Must be a year row.
         else:
             year = components[0]
             monthAndDay = components[-1]
             day, month = monthAndDay.split("-")
-            return datetime.datetime.strptime(
-                f"{year}/{month}/{day}", "%Y/%b/%d"
-            ).date()
+            return datetime.datetime.strptime(f"{year}/{month}/{day}", "%Y/%b/%d").date()
 
     def _isValidCell(self, cell):
         return not pandas.isna(cell)
@@ -354,7 +348,7 @@ class _VacationFileParser:
 
     @staticmethod
     def readCell(cell):
-        cellStripped = ''.join(cell.split(' '))
+        cellStripped = "".join(cell.split(" "))
         docsToDays = {}
 
         doc = []
@@ -362,16 +356,16 @@ class _VacationFileParser:
         for ix in range(len(cellStripped)):
             character = cellStripped[ix]
 
-            if not character.isalnum() and character != '/':
+            if not character.isalnum() and character != "/":
                 pass
 
             elif _VacationFileParser._isANumber(character):
                 day.append(character)
 
-            elif character == '/':
-                if len(day)>0:
-                    day = int(''.join(day))
-                    doc = ''.join(doc)
+            elif character == "/":
+                if len(day) > 0:
+                    day = int("".join(day))
+                    doc = "".join(doc)
                     docsToDays.setdefault(doc, []).append(day)
                     day = []
                 else:
@@ -379,16 +373,16 @@ class _VacationFileParser:
 
             else:
                 if len(doc) == 2:
-                    docsToDays.setdefault(doc, []).append(int(''.join(day)))
+                    docsToDays.setdefault(doc, []).append(int("".join(day)))
                     doc = [character]
                     day = []
                 else:
                     doc.append(character)
 
-        if len(day)>0:
+        if len(day) > 0:
             if isinstance(doc, list):
-                doc = ''.join(doc)
-            docsToDays.setdefault(doc, []).append(int(''.join(day)))
+                doc = "".join(doc)
+            docsToDays.setdefault(doc, []).append(int("".join(day)))
         return docsToDays
 
     def _getDoctorsAndWeekTypeFromCell(self, cell):
@@ -413,7 +407,6 @@ class _VacationFileParser:
             weekType = "full"
             doctors = cell.split(" ")
 
-
         doctorNames = []
         for doctor in doctors:
             doc = doctor.strip(" ")
@@ -423,7 +416,7 @@ class _VacationFileParser:
         return doctorNames, weekType
 
     def _applyAssignment(self, schedule, monday, weekType, doctors):
-        if weekType == 'special':
+        if weekType == "special":
             assert isinstance(doctors, dict)
             for doctor, dayNumbers in doctors.items():
                 for day in dayNumbers:

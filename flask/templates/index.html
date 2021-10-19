@@ -7,7 +7,7 @@ table{
 	border-collapse:collapse;
 	border:1px solid #000000;
 	table-layout: fixed;
-	font-size:.7vw;
+	font-size:1vw;
 
 }
 
@@ -79,7 +79,7 @@ $(document).ready(function(){
 	    {% for colName in columnNames %}
           <td> 
 		  <div class='edit'> {{row[colName]}}</div> 
-	    <input type='textbox' class='txtedit' value='{{row[colName]}}' id='{{row[colName]}}_{{colName}}'>
+		  <input type='textbox' class='txtedit' value='{{row[colName]}}' id='{{row.date}}'>
           </td>
 	    {% endfor %}
          </tr>
