@@ -11,9 +11,6 @@ ownDir = os.path.dirname(os.path.abspath(__file__))
 class VacationParserTest(unittest.TestCase):
     def test_toCsvSimpleAndFromCsvSimple(self):
         filepath = os.path.join(ownDir, "fixtures", "gibberish with.xlsx")
-        filepath = os.path.join(
-            "~/code/vacation_schedule/schedule", "fixtures", "gibberish with.xlsx"
-        )
         schedule = VacationSchedule.fromGibberishFile(filepath)
 
         csvSimpleFile = tempfile.NamedTemporaryFile()

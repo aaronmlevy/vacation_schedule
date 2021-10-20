@@ -7,16 +7,14 @@ name = "pypi"
 pandas = "*"
 xlrd = "*"
 pytest = "*"
-numpy = "*"
 openpyxl = "*"
-mysql = "*"
-mysql-connector-python = "*"
 flask = "*"
 flask-mysql = "*"
-mysqlclient = "*"
 sqlalchemy = "*"
+numpy = "*"
+greenlet = "*"
 
 [dev-packages]
 
 [requires]
-python_version = "3.9"
+python_version = "3.7"

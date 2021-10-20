@@ -213,20 +213,20 @@ class VacationSchedule:
 
         return schedule
 
-    def toSql(self, tableName="vacation_schedule"):
-        engine = create_engine("mysql+pymysql://root:@localhost/vacation_schedule_db")
+    def toSql(self, tableName="vacation_schedule", username='pi'):
+        engine = create_engine(f"mysql+pymysql://{username}:@localhost/vacation_schedule_db")
         df = pandas.read_csv(io.StringIO(self._asCalendarString()))
         df = df.fillna("")
         df.to_sql(tableName, engine)
 
     @staticmethod
-    def fromSql(tableName="vacation_schedule"):
-        engine = create_engine("mysql+pymysql://root:@localhost/vacation_schedule_db")
+    def fromSql(tableName="vacation_schedule", username='pi'):
+        engine = create_engine(f"mysql+pymysql://{username}@localhost/vacation_schedule_db")
         df = pandas.read_sql(f"select * from {tableName}", engine)
         return VacationSchedule._fromDataframe(df)
 
-    def toSqlSimple(self, tableName="vacation_schedule"):
-        engine = create_engine("mysql+pymysql://root:@localhost/vacation_schedule_db")
+    def toSqlSimple(self, tableName="vacation_schedule", username='pi'):
+        engine = create_engine(f"mysql+pymysql://{username}:@localhost/vacation_schedule_db")
         csvString = self._asCsvSimpleString()
         csvRows = csvString.split("\n")
         csvRowsNew = [csvRows[0]]
@@ -243,8 +243,8 @@ class VacationSchedule:
         df.to_sql(tableName, engine)
 
     @staticmethod
-    def fromSqlSimple(tableName="vacation_schedule"):
-        engine = create_engine("mysql+pymysql://root:@localhost/vacation_schedule_db")
+    def fromSqlSimple(tableName="vacation_schedule", username='pi'):
+        engine = create_engine(f"mysql+pymysql://{username}:@localhost/vacation_schedule_db")
         df = pandas.read_sql(f"select * from {tableName}", engine)
         startDate = datetime.datetime.strptime(df.date[0], "%Y-%m-%d").date()
         endDate = datetime.datetime.strptime(df.date[len(df) - 1], "%Y-%m-%d").date()
