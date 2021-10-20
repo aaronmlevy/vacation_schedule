@@ -1,0 +1,4 @@
+- Add logging
+- Add user field/login
+- Productionize server
+- Add rules for bringing service back up when it fails
