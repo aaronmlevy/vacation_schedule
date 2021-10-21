@@ -47,7 +47,7 @@ $(document).ready(function(){
   $(this).prev('.edit').text(value);
  
   $.ajax({
-   url: '/update',
+   url: '/vacation_schedule/update',
    type: 'post',
    data: { field:date, value:value, id:edit_id },
    success:function(response){
