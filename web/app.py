@@ -1,12 +1,13 @@
-import os
 import datetime
-
 from flask import Flask, request, render_template, jsonify, url_for, session, redirect
 from flaskext.mysql import MySQL
 import pymysql
+import os
+from waitress import serve
 
 from git_util import Git
 from schedule.VacationSchedule import VacationSchedule
+
 
 app = Flask(__name__)
 
@@ -79,22 +80,24 @@ def update():
         conn = mysql.connect()
         cursor = conn.cursor(pymysql.cursors.DictCursor)
         if request.method == "POST":
-            # Update the sql database.
+            # Get the date that changed.
             date = request.form["field"]
+
+            # Get old assignments on that date.
+            sql = f"select * from vacation_schedule where date='{date}';"
+            cursor.execute(sql)
+            row = cursor.fetchone()
+            oldDoctorList = row['doctors']
+
+            # Set new assignments on date.
             newDoctorList = request.form["value"]
             sql = (
                 f"update vacation_schedule set doctors='{newDoctorList}' where date='{date}';"
             )
-            conn = mysql.connect()
-            cursor = conn.cursor()
             cursor.execute(sql)
             conn.commit()
 
-            # Commit log to other directory.
-            sql = f"select * from vacation_schedule where date='{date}';"
-            cursor.execute(sql)
-            row = cursor.fetchone()
-            oldDoctorList = row[2]
+            # Commit new table to log repo.
             commitMessage = (
                 f"CHANGE: User '{user}' changed date '{date}' "
                 f"from '{oldDoctorList}' to '{newDoctorList}'."
@@ -118,4 +121,4 @@ def commitTableToLog(writePath, commitMessage):
 
 
 if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=5000)
+    serve(app, host="0.0.0.0", port=5000)
