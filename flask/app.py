@@ -5,12 +5,16 @@ from flask import Flask, request, render_template, jsonify, url_for, session, re
 from flaskext.mysql import MySQL
 import pymysql
 
+from .git_util import Git
 from schedule.VacationSchedule import VacationSchedule
-ownDir = os.path.dirname(os.path.abspath(__file__))
 
 app = Flask(__name__)
+
 ownDir = os.path.dirname(os.path.abspath(__file__))
-logfile_path = os.path.join(os.path.dirname(ownDir), 'log', 'log.txt')
+logRepoRoot = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(ownDir))), "log")
+logFilepath = os.path.join(logRepoRoot, "log", "schedule.csv")
+
+git = Git(logRepoRoot)
 
 mysql = MySQL()
 
@@ -19,12 +23,14 @@ app.config["MYSQL_DATABASE_PASSWORD"] = ""
 app.config["MYSQL_DATABASE_DB"] = "vacation_schedule_db"
 app.config["MYSQL_DATABASE_HOST"] = "localhost"
 app.secret_key = "super secret key"
+
 mysql.init_app(app)
 
 
 @app.route("/")
 def redirectToSignin():
     return redirect(url_for("sign_in"))
+
 
 @app.route("/vacation_schedule")
 def vacation_schedule():
@@ -33,7 +39,7 @@ def vacation_schedule():
     try:
         conn = mysql.connect()
         cursor = conn.cursor(pymysql.cursors.DictCursor)
-        cursor.execute("SELECT * from vacation_schedule")
+        cursor.execute("select * from vacation_schedule;")
         schedule = cursor.fetchall()
 
         if len(schedule) > 0:
@@ -73,10 +79,27 @@ def update():
         conn = mysql.connect()
         cursor = conn.cursor(pymysql.cursors.DictCursor)
         if request.method == "POST":
+            # Update the sql database.
             date = request.form["field"]
             newDoctorList = request.form["value"]
-            oldDoctorList = getOldDoctorListOnDate(date, cursor)
-            success = updateSqlDatabase(newDoctorList, oldDoctorList, date, user, cursor)
+            sql = (
+                f"update vacation_schedule set doctors='{newDoctorList}' where date='{date}';"
+            )
+            conn = mysql.connect()
+            cursor = conn.cursor()
+            cursor.execute(sql)
+            conn.commit()
+
+            # Commit log to other directory.
+            sql = f"select * from vacation_schedule where date='{date}';"
+            cursor.execute(sql)
+            oldDoctorList = cursor.fetchone()["doctors"]
+            commitMessage = (
+                f"CHANGE: User '{user}' changed date '{date}' "
+                f"from '{oldDoctorList}' to '{newDoctorList}'."
+            )
+            commitTableToLog(logFilepath, commitMessage)
+
         return jsonify(success)
     except Exception as e:
         print(e)
@@ -85,36 +108,12 @@ def update():
         conn.close()
 
 
-def getOldDoctorListOnDate(date, cursor):
-    sql = f"select * from vacation_schedule WHERE date='{date}';"
-    cursor.execute(sql)
-
-    counter = 0
-    for row in cursor:
-        oldDoctorList = row["doctors"]
-        counter += 1
-    assert counter == 1
-
-    return oldDoctorList
-
-
-def updateSqlDatabase(newDoctorList, oldDoctorList, date, user, cursor):
-    sql = f"UPDATE vacation_schedule SET doctors='{newDoctorList}' WHERE date='{date}';"
-    with open(logfile_path, "a") as f:
-        f.write(
-            "==========================================\n"
-            f"======= {datetime.datetime.now()} =======\n"
-            "==========================================\n"
-            f"User {user} changed {date} from\n"
-            f"'{oldDoctorList}' to\n'{newDoctorList}'\n\n"
-        )
-
-    conn = mysql.connect()
-    cursor = conn.cursor()
-    cursor.execute(sql)
-    conn.commit()
-    return True
+def commitTableToLog(writePath, commitMessage):
+    schedule = VacationSchedule.fromSqlSimple()
+    schedule.toCsvSimple(writePath)
+    git.add(writePath)
+    git.commit(withMessage=commitMessage)
 
 
 if __name__ == "__main__":
-    app.run(host = '0.0.0.0', port=5000)
+    app.run(host="0.0.0.0", port=5000)
