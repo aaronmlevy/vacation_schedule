@@ -5,14 +5,14 @@ from flask import Flask, request, render_template, jsonify, url_for, session, re
 from flaskext.mysql import MySQL
 import pymysql
 
-from .git_util import Git
+from git_util import Git
 from schedule.VacationSchedule import VacationSchedule
 
 app = Flask(__name__)
 
 ownDir = os.path.dirname(os.path.abspath(__file__))
-logRepoRoot = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(ownDir))), "log")
-logFilepath = os.path.join(logRepoRoot, "log", "schedule.csv")
+logRepoRoot = os.path.join(os.path.dirname(os.path.dirname(ownDir)), "log")
+logFilepath = os.path.join(logRepoRoot, "schedule.csv")
 
 git = Git(logRepoRoot)
 
@@ -93,12 +93,14 @@ def update():
             # Commit log to other directory.
             sql = f"select * from vacation_schedule where date='{date}';"
             cursor.execute(sql)
-            oldDoctorList = cursor.fetchone()["doctors"]
+            row = cursor.fetchone()
+            oldDoctorList = row[2]
             commitMessage = (
                 f"CHANGE: User '{user}' changed date '{date}' "
                 f"from '{oldDoctorList}' to '{newDoctorList}'."
             )
             commitTableToLog(logFilepath, commitMessage)
+            success = True
 
         return jsonify(success)
     except Exception as e:
